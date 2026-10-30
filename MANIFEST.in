@@ -1,0 +1,7 @@
+include ReefFrame.spec
+recursive-include assets/icons *.svg *.png *.icns
+include scripts/build_icon.py
+include docs/ReefFrame.md
+recursive-include docs/screenshots *.png
+recursive-include src/config/defaults *.json
+recursive-include src/resources *.png

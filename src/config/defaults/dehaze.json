@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "operation": "dehaze",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "contrast": 1.25,
+    "brightness": -0.02,
+    "crf": 18,
+    "preset": "slow"
+  }
+}

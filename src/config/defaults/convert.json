@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "operation": "convert",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "codec": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "pixel_format": "yuv420p",
+    "audio_codec": "aac",
+    "audio_bitrate": "192k"
+  }
+}

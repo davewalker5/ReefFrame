@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "operation": "stabilise",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "shakiness": 5,
+    "accuracy": 5,
+    "smoothing": 15,
+    "optzoom": 1,
+    "crf": 18,
+    "preset": "medium",
+    "keep_motion": false
+  }
+}

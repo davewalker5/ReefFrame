@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "operation": "enhance",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "contrast": 1.3,
+    "brightness": -0.03,
+    "second_contrast": 1.3,
+    "vibrance": 0.3,
+    "crf": 18,
+    "preset": "slow"
+  }
+}

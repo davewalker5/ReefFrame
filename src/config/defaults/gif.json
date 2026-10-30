@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "operation": "gif",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "fps": 8,
+    "width": 480,
+    "colors": 256,
+    "dither": "sierra2_4a",
+    "loop": 1
+  }
+}

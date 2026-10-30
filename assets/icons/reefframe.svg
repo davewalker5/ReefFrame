@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="sea" x2="0.8" y2="1"><stop stop-color="#124b72"/><stop offset="1" stop-color="#062735"/></linearGradient></defs>
+<rect x="40" y="40" width="944" height="944" rx="215" fill="url(#sea)"/>
+<path d="M230 350V250h120M674 250h120v100M794 674v100H674M350 774H230V674" fill="none" stroke="#9af4e5" stroke-width="38" stroke-linecap="round"/>
+<path d="M155 600Q330 505 510 600T870 600V805Q870 870 805 870H220Q155 870 155 805Z" fill="#0e827e"/>
+<path d="M474 774V510M474 635l-110-95M474 580l100-100M474 715l115-80M364 540v-70M574 480v-55M589 635l60-10" fill="none" stroke="#ff927e" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M610 367l100 62-100 62Z" fill="#9af4e5"/>
+<circle cx="354" cy="365" r="24" fill="#39c9c2"/><circle cx="401" cy="302" r="14" fill="#39c9c2"/>
+</svg>
