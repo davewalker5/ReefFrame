@@ -3,6 +3,7 @@
 from PySide6.QtCore import QThread, Signal
 
 from processing.batch import run_batch
+from processing.trial import TrialRange
 
 
 class BatchWorker(QThread):
@@ -11,7 +12,14 @@ class BatchWorker(QThread):
     progress = Signal(str, float, str)
     outcomes = Signal(object)
 
-    def __init__(self, sources: list, operation: str, settings: dict, runner: object) -> None:
+    def __init__(
+        self,
+        sources: list,
+        operation: str,
+        settings: dict,
+        runner: object,
+        trial: TrialRange | None = None,
+    ) -> None:
         """
         Capture an immutable input queue and dedicated runner.
 
@@ -19,6 +27,7 @@ class BatchWorker(QThread):
         :param operation: Registered operation name used to select defaults and processing
             behaviour.
         :param settings: Complete operation settings; validated before use.
+        :param trial: Optional single-file trial interval.
         :param runner: FFmpeg runner providing capability checks, probing, execution and
             cancellation.
         """
@@ -27,10 +36,16 @@ class BatchWorker(QThread):
         self.operation = operation
         self.settings = dict(settings)
         self.runner = runner
+        self.trial = trial
 
     def run(self) -> None:
         """Run the core engine and deliver its per-file results."""
         results = run_batch(
-            self.sources, self.operation, self.settings, self.runner, self.progress.emit
+            self.sources,
+            self.operation,
+            self.settings,
+            self.runner,
+            self.progress.emit,
+            trial=self.trial,
         )
         self.outcomes.emit(results)

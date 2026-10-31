@@ -12,6 +12,7 @@ from pathlib import Path
 from config.settings import validate
 from processing.ffmpeg_runner import CancelledError, FFmpegRunner
 from processing.file_naming import eligible, output_path
+from processing.trial import TRIAL_OPERATIONS, TrialRange
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ def run_batch(
     runner: FFmpegRunner,
     event: Callable[[str, float, str], None],
     stop_on_error: bool = False,
+    trial: TrialRange | None = None,
 ) -> list[JobResult]:
     """
     Process a frozen queue sequentially, preserving source and existing outputs on failure.
@@ -59,12 +61,15 @@ def run_batch(
     :param event: Callback receiving filename, percentage and message; negative percentages identify
         logs or counts.
     :param stop_on_error: Whether to stop at the first failed file instead of continuing the queue.
+    :param trial: Optional single-file interval, independent of reusable settings.
     :return: Per-file outcomes for attempted or skipped files; cancellation leaves later files
         unstarted.
     :raises ValueError: If batch settings are invalid; per-file errors are returned as outcomes.
     """
     settings = validate(operation, settings)
     queue = tuple(Path(source).absolute() for source in sources)
+    if trial is not None and (len(queue) != 1 or operation not in TRIAL_OPERATIONS):
+        raise ValueError("Trial mode requires one file and Dehaze, Enhance or Stabilise")
     results = []
     destinations = set()
     source_paths = {str(path.resolve()).casefold() for path in queue}
@@ -77,6 +82,8 @@ def run_batch(
                 results.append(JobResult(source, "skipped", "Ineligible input"))
                 continue
             destination = output_path(source, operation, settings)
+            if trial is not None:
+                destination = destination.with_stem(destination.stem + trial.suffix())
             key = str(destination.resolve()).casefold()
             if key in source_paths:
                 raise ValueError("Output matches a queued source file")
@@ -93,6 +100,8 @@ def run_batch(
             if reason:
                 raise ValueError(reason)
             metadata = runner.probe(source)
+            if trial is not None:
+                trial.validate(metadata.duration)
             if operation == "snapshot":
                 hours, minutes, seconds = settings["timestamp"].split(":")
                 if (
@@ -117,11 +126,15 @@ def run_batch(
                     else [("Rendering", module.build_arguments(source, temporary, settings))]
                 )
                 for phase, arguments in phases:
+                    if trial is not None and "-c:a" in arguments:
+                        audio_index = arguments.index("-c:a") + 1
+                        if arguments[audio_index] == "copy":
+                            arguments[audio_index] = "aac"
                     event(source.name, 0, phase)
                     runner.run(
-                        arguments,
+                        trial.apply(arguments, str(source)) if trial is not None else arguments,
                         work,
-                        metadata.duration,
+                        trial.end - trial.start if trial is not None else metadata.duration,
                         lambda percent: event(source.name, percent, phase),
                         lambda line: event(source.name, -1, line),
                     )

@@ -108,3 +108,42 @@ def test_operation_changes_preserve_selection(
     window.refresh()
     assert set(window.selected_paths()) == expected
     window.hide()
+
+
+@pytest.mark.parametrize("launch_succeeds", [True, False])
+def test_double_click_opens_video(application, tmp_path, monkeypatch, launch_succeeds):
+    """Open the clicked sorted row as a local URL and report launch failure.
+
+    :param application: Shared offscreen Qt application fixture.
+    :param tmp_path: Isolated temporary directory supplied by pytest.
+    :param monkeypatch: Scoped replacement of player launch and message boxes.
+    :param launch_succeeds: Whether the OS accepts the request to open the video.
+    """
+    from PySide6.QtCore import Qt
+
+    from gui.main_window import MainWindow, QDesktopServices, QMessageBox
+
+    monkeypatch.setattr(MainWindow, "check_dependencies", lambda self: None)
+    opened = []
+    warnings = []
+    monkeypatch.setattr(
+        QDesktopServices, "openUrl", lambda url: opened.append(url) or launch_succeeds
+    )
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args))
+    window = MainWindow()
+    for name in ("a.mp4", "z '海 # clip.MOV"):
+        (tmp_path / name).touch()
+    window.folder = tmp_path
+    window.refresh()
+    window.table.sortItems(0, Qt.SortOrder.DescendingOrder)
+    window.table.selectRow(1)
+    window.table.itemDoubleClicked.emit(window.table.item(0, 2))
+    assert len(opened) == 1
+    assert opened[0].isLocalFile()
+    assert opened[0].toLocalFile() == str(tmp_path / "z '海 # clip.MOV")
+    assert len(warnings) == (0 if launch_succeeds else 1)
+    (tmp_path / "z '海 # clip.MOV").unlink()
+    window.table.itemDoubleClicked.emit(window.table.item(0, 0))
+    assert len(opened) == 1
+    assert len(warnings) == (1 if launch_succeeds else 2)
+    window.hide()

@@ -58,3 +58,45 @@ def test_mismatched_preset(tmp_path):
     path.write_text("{")
     with pytest.raises(json.JSONDecodeError):
         load_preset(path, "convert")
+
+
+def test_standard_directories(monkeypatch, tmp_path):
+    """Use Qt's distinct configuration and local-data locations.
+
+    :param monkeypatch: Scoped replacement of Qt's directory lookup.
+    :param tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    from config import settings
+
+    locations = {
+        settings.QStandardPaths.StandardLocation.AppConfigLocation: str(tmp_path / "config"),
+        settings.QStandardPaths.StandardLocation.AppLocalDataLocation: str(tmp_path / "data"),
+    }
+    monkeypatch.setattr(settings.QStandardPaths, "writableLocation", locations.__getitem__)
+    assert settings.user_directory() == tmp_path / "config"
+    assert settings.log_directory() == tmp_path / "data" / "logs"
+
+
+def test_migrate_settings(monkeypatch, tmp_path):
+    """Preserve legacy preferences and presets without replacing new settings.
+
+    :param monkeypatch: Scoped replacement of home and destination directories.
+    :param tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    from config import settings
+
+    monkeypatch.setattr(settings.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(settings.sys, "platform", "darwin")
+    destination = tmp_path / "new-config"
+    monkeypatch.setattr(settings, "user_directory", lambda: destination)
+    legacy = tmp_path / "Library" / "Application Support" / "ReefFrame"
+    (legacy / "presets").mkdir(parents=True)
+    (legacy / "preferences.ini").write_text("old preferences")
+    (legacy / "presets" / "example.json").write_text("{}")
+    settings.migrate_user_settings()
+    assert (destination / "preferences.ini").read_text() == "old preferences"
+    assert (destination / "presets" / "example.json").read_text() == "{}"
+    (destination / "preferences.ini").write_text("new preferences")
+    settings.migrate_user_settings()
+    assert (destination / "preferences.ini").read_text() == "new preferences"
+    assert (legacy / "preferences.ini").read_text() == "old preferences"

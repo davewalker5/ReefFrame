@@ -26,8 +26,9 @@ import gui.main_window as gui
 
 application = QApplication([])
 main.QApplication = lambda arguments: application
-main.user_directory = lambda: Path(sys.argv[1])
-gui.user_directory = main.user_directory
+main.log_directory = lambda: Path(sys.argv[1]) / "logs"
+main.migrate_user_settings = lambda: None
+gui.user_directory = lambda: Path(sys.argv[1])
 original_init = gui.MainWindow.__init__
 gui.MainWindow.check_dependencies = lambda self: None
 
