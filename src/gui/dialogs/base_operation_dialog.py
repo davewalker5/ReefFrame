@@ -4,7 +4,6 @@ import math
 import re
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -19,7 +18,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -104,14 +102,10 @@ class BaseOperationDialog(QDialog):
                 "Stabilisation near the start and end of a trial may differ from full-clip "
                 "processing. Choose a slightly longer section to assess the middle."
             )
-            info = QToolButton()
-            info.setText("ⓘ")
-            info.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            info = QLabel("ⓘ")
             info.setAccessibleName("About stabilisation trials")
             info.setToolTip(note)
-            info.clicked.connect(
-                lambda: QMessageBox.information(self, "Stabilisation trials", note)
-            )
+            info.setAccessibleDescription(note)
             row.addWidget(info)
         row.addStretch()
         self.form.addRow(self.trial_group)

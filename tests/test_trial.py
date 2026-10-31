@@ -167,24 +167,19 @@ def test_trial_selection_context(application, tmp_path, monkeypatch, all_eligibl
     window.close()
 
 
-def test_stabilisation_information(application, monkeypatch):
-    """Expose the boundary note by tooltip and keyboard-accessible button activation.
+def test_stabilisation_information(application):
+    """Expose the boundary note through a plain information label's tooltip.
 
     :param application: Shared offscreen Qt application fixture.
-    :param monkeypatch: Scoped replacement of the information message box.
     """
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QMessageBox, QToolButton
+    from PySide6.QtWidgets import QLabel, QToolButton
 
     dialog = DIALOGS["stabilise"]()
     dialog.configure_trial(10)
-    info = dialog.findChild(QToolButton)
+    info = next(label for label in dialog.findChildren(QLabel) if label.text() == "ⓘ")
     assert "start and end" in info.toolTip()
-    assert info.focusPolicy() == Qt.FocusPolicy.StrongFocus
-    messages = []
-    monkeypatch.setattr(QMessageBox, "information", lambda *args: messages.append(args))
-    info.click()
-    assert messages[0][2] == info.toolTip()
+    assert info.accessibleDescription() == info.toolTip()
+    assert not dialog.findChildren(QToolButton)
     dialog.close()
 
 
