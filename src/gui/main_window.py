@@ -29,6 +29,7 @@ from config.settings import OPERATIONS, user_directory
 from gui.workers import BatchWorker
 from processing.ffmpeg_runner import FFmpegRunner
 from processing.file_naming import eligible, scan
+from processing.trial import TRIAL_OPERATIONS
 
 DIALOGS = {
     name: getattr(importlib.import_module(f"gui.dialogs.{name}_dialog"), name.title() + "Dialog")
@@ -296,6 +297,8 @@ class MainWindow(QMainWindow):
         operation = self.operation.currentText()
         sources = self.paths[:] if all_eligible else self.selected_paths()
 
+        single_selected = not all_eligible and len(sources) == 1
+
         # Retain the user selection, but queue only inputs supported by this operation.
         ineligible = sum(not eligible(path, operation) for path in sources)
         sources = [path for path in sources if eligible(path, operation)]
@@ -306,6 +309,16 @@ class MainWindow(QMainWindow):
             return
 
         dialog = DIALOGS[operation](self)
+        if operation in TRIAL_OPERATIONS:
+            duration = 0
+            reason = "Trial mode requires a single selected video; use Process selected."
+            if single_selected:
+                try:
+                    duration = self.runner.probe(sources[0]).duration
+                    reason = "Trial mode requires a video with a known duration."
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                    reason = f"Cannot determine video duration: {error}"
+            dialog.configure_trial(duration, reason)
         if not dialog.exec():
             return
 
@@ -317,7 +330,9 @@ class MainWindow(QMainWindow):
 
         # The shared runner may still carry a cancellation request from the previous batch.
         self.runner.cancelled.clear()
-        self.worker = BatchWorker(sources, operation, settings, self.runner)
+        self.worker = BatchWorker(
+            sources, operation, settings, self.runner, trial=dialog.trial_range()
+        )
 
         # Qt delivers these signals to GUI-thread slots; workers never mutate widgets.
         self.worker.progress.connect(self.report_progress)

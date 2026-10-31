@@ -1,7 +1,10 @@
 """Shared preset and output controls for dedicated operation forms."""
 
+import math
+import re
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,6 +19,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -29,6 +33,7 @@ from config.settings import (
     user_directory,
     validate,
 )
+from processing.trial import TRIAL_OPERATIONS, TrialRange
 
 
 class BaseOperationDialog(QDialog):
@@ -58,6 +63,9 @@ class BaseOperationDialog(QDialog):
                 "Video comparisons fit within 1920 × 1080 for smooth playback. "
                 "Aspect ratio and frame timing are preserved."
             )
+        self.trial_duration = 0.0
+        if operation in TRIAL_OPERATIONS:
+            self.build_trial_controls()
         self.add_field("overwrite", "Overwrite existing outputs")
         self.add_field("output_name", "Output filename (blank = automatic)")
         self.controls["output_name"].setToolTip(
@@ -83,6 +91,96 @@ class BaseOperationDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
         self.set_values(self.values)
+
+    def build_trial_controls(self) -> None:
+        """Add per-run trial controls, disabled until a single source is supplied."""
+        self.trial_group = QWidget()
+        row = QHBoxLayout(self.trial_group)
+        row.setContentsMargins(0, 0, 0, 0)
+        self.trial_enabled = QCheckBox("Trial mode")
+        row.addWidget(self.trial_enabled)
+        if self.operation == "stabilise":
+            note = (
+                "Stabilisation near the start and end of a trial may differ from full-clip "
+                "processing. Choose a slightly longer section to assess the middle."
+            )
+            info = QToolButton()
+            info.setText("ⓘ")
+            info.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            info.setAccessibleName("About stabilisation trials")
+            info.setToolTip(note)
+            info.clicked.connect(
+                lambda: QMessageBox.information(self, "Stabilisation trials", note)
+            )
+            row.addWidget(info)
+        row.addStretch()
+        self.form.addRow(self.trial_group)
+        self.trial_times = QWidget()
+        times = QFormLayout(self.trial_times)
+        times.setContentsMargins(0, 0, 0, 0)
+        self.trial_start = QLineEdit("00:00:00")
+        self.trial_end = QLineEdit("00:00:00")
+        for label, control in (("Start time", self.trial_start), ("End time", self.trial_end)):
+            control.setAccessibleName(label)
+            control.setToolTip("HH:MM:SS or HH:MM:SS.mmm")
+            times.addRow(label, control)
+        self.form.addRow(self.trial_times)
+        self.trial_enabled.toggled.connect(self.trial_times.setEnabled)
+        self.trial_times.setEnabled(False)
+        self.trial_group.setEnabled(False)
+        self.trial_group.setToolTip("Trial mode requires a single selected video.")
+
+    @staticmethod
+    def format_trial_time(seconds: float) -> str:
+        """Format a duration without rounding beyond the source endpoint.
+
+        :param seconds: Source duration in seconds.
+        :return: Timestamp in HH:MM:SS.mmm form.
+        """
+        milliseconds = math.floor(seconds * 1000)
+        hours, remainder = divmod(milliseconds, 3600000)
+        minutes, remainder = divmod(remainder, 60000)
+        return f"{hours:02}:{minutes:02}:{remainder // 1000:02}.{remainder % 1000:03}"
+
+    def configure_trial(self, duration: float = 0, reason: str = "") -> None:
+        """Enable trial mode only for a known-duration, explicitly selected single file.
+
+        :param duration: Probed duration of the selected file, or zero when unavailable.
+        :param reason: Explanation when trial mode is unavailable.
+        """
+        if self.operation not in TRIAL_OPERATIONS:
+            return
+        available = math.isfinite(duration) and duration > 0
+        self.trial_duration = duration if available else 0
+        self.trial_enabled.setChecked(False)
+        self.trial_group.setEnabled(available)
+        self.trial_group.setToolTip(
+            "Process a short section to check settings." if available else reason
+        )
+        self.trial_end.setText(self.format_trial_time(self.trial_duration))
+        self.trial_times.setEnabled(False)
+        self.trial_times.setToolTip("" if available else reason)
+
+    def trial_range(self) -> TrialRange | None:
+        """Read and validate per-run trial controls without changing preset settings.
+
+        :return: Selected trial interval, or None for whole-video processing.
+        :raises ValueError: If enabled trial timestamps are malformed or outside the video.
+        """
+        if self.operation not in TRIAL_OPERATIONS or not self.trial_group.isEnabled():
+            return None
+        if not self.trial_enabled.isChecked():
+            return None
+        seconds = []
+        for control in (self.trial_start, self.trial_end):
+            text = control.text().strip()
+            if not re.fullmatch(r"[0-9]{2,}:[0-5][0-9]:[0-5][0-9](\.[0-9]{1,3})?", text):
+                raise ValueError("Trial times must use HH:MM:SS or HH:MM:SS.mmm")
+            hours, minutes, rest = text.split(":")
+            seconds.append(int(hours) * 3600 + int(minutes) * 60 + float(rest))
+        trial = TrialRange(*seconds)
+        trial.validate(self.trial_duration)
+        return trial
 
     def build_parameters(self) -> None:
         """
@@ -161,6 +259,7 @@ class BaseOperationDialog(QDialog):
         """Keep the dialog open and display actionable validation errors."""
         try:
             self.settings()
+            self.trial_range()
         except ValueError as error:
             self.error.setText(str(error))
             return
@@ -169,6 +268,10 @@ class BaseOperationDialog(QDialog):
     def restore_defaults(self) -> None:
         """Restore immutable shipped defaults."""
         self.set_values(load_default(self.operation))
+        if self.operation in TRIAL_OPERATIONS:
+            self.trial_enabled.setChecked(False)
+            self.trial_start.setText("00:00:00")
+            self.trial_end.setText(self.format_trial_time(self.trial_duration))
 
     def import_preset(self) -> None:
         """Import a named JSON preset, displaying invalid data errors."""
