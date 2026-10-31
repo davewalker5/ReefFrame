@@ -8,7 +8,7 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from config.settings import user_directory
+from config.settings import log_directory, migrate_user_settings
 from gui.main_window import MainWindow
 
 
@@ -18,16 +18,17 @@ def main() -> int:
 
     :return: Application event-loop exit code, zero for a normal exit.
     """
-    directory = user_directory()
+    application = QApplication(sys.argv)
+    application.setApplicationName("ReefFrame")
+    application.setOrganizationName("ReefFrame")
+    migrate_user_settings()
+    directory = log_directory()
     directory.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         filename=directory / "reefframe.log",
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    application = QApplication(sys.argv)
-    application.setApplicationName("ReefFrame")
-    application.setOrganizationName("ReefFrame")
     application.setWindowIcon(QIcon(str(files("resources").joinpath("reefframe.png"))))
     application.setStyle("Fusion")
     window = MainWindow()

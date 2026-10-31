@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reef-frame"
-version = "1.0.0"
+version = "1.1.0"
 description = "A Python desktop application for enhancing, stabilising and preparing underwater action-camera footage using FFmpeg"
 readme = "README.md"
 requires-python = ">=3.14"

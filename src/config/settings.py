@@ -3,9 +3,12 @@
 import json
 import math
 import re
+import shutil
 import sys
 from importlib.resources import files
 from pathlib import Path
+
+from PySide6.QtCore import QStandardPaths
 
 OPERATIONS = ("convert", "dehaze", "enhance", "reduce", "gif", "snapshot", "stabilise")
 RANGES = {
@@ -50,8 +53,36 @@ def user_directory() -> Path:
 
     :return: Platform-specific user configuration directory; it may not exist yet.
     """
-    base = Path.home() / ("Library/Application Support" if sys.platform == "darwin" else ".config")
-    return base / "ReefFrame"
+    return Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation))
+
+
+def log_directory() -> Path:
+    """Return the platform's application-local data directory for logs.
+
+    :return: Log directory; it may not exist yet.
+    """
+    return Path(
+        QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
+    ) / "logs"
+
+
+def migrate_user_settings() -> None:
+    """Copy legacy preferences and presets when their new locations do not exist."""
+    legacy = Path.home() / (
+        "Library/Application Support" if sys.platform == "darwin" else ".config"
+    ) / "ReefFrame"
+    destination = user_directory()
+    if legacy == destination:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ("preferences.ini", "presets"):
+        source = legacy / name
+        target = destination / name
+        if source.exists() and not target.exists():
+            if source.is_dir():
+                shutil.copytree(source, target)
+            else:
+                shutil.copy2(source, target)
 
 
 def load_default(operation: str) -> dict:
