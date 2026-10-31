@@ -26,6 +26,7 @@ def main() -> int:
     directory.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         filename=directory / "reefframe.log",
+        filemode="w",
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
