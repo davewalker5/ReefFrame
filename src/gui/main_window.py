@@ -5,8 +5,8 @@ import subprocess
 from importlib.resources import files
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QCloseEvent, QPixmap
+from PySide6.QtCore import QSettings, Qt, QUrl
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.itemDoubleClicked.connect(self.open_video)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 430)
         self.table.setStyleSheet(
@@ -255,6 +256,20 @@ class MainWindow(QMainWindow):
         if not busy:
             self.status.setText(
                 reason or f"{sum(eligible(p, operation) for p in self.paths)} eligible files"
+            )
+
+    def open_video(self, item: QTableWidgetItem) -> None:
+        """Open the double-clicked video in the operating system's default player.
+
+        :param item: Clicked table cell containing the video's stored filesystem path.
+        """
+        path = Path(item.data(Qt.ItemDataRole.UserRole)).absolute()
+        if not path.is_file():
+            QMessageBox.warning(self, "Cannot open video", f"Video no longer exists: {path}")
+            return
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            QMessageBox.warning(
+                self, "Cannot open video", f"Could not open the default player for: {path}"
             )
 
     def selected_paths(self) -> list[Path]:
