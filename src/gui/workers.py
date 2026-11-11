@@ -1,5 +1,7 @@
 """Thread boundary for sequential processing."""
 
+from copy import deepcopy
+
 from PySide6.QtCore import QThread, Signal
 
 from processing.batch import run_batch
@@ -34,7 +36,7 @@ class BatchWorker(QThread):
         super().__init__()
         self.sources = tuple(sources)
         self.operation = operation
-        self.settings = dict(settings)
+        self.settings = deepcopy(settings)
         self.runner = runner
         self.trial = trial
 

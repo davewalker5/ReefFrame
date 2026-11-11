@@ -4,6 +4,7 @@ from pathlib import Path
 
 from config.settings import validate
 from processing.commands import filtered_video
+from processing.correction_filters import contrast_filter
 
 
 def build_arguments(source: Path, destination: Path, settings: dict) -> list[str]:
@@ -16,5 +17,4 @@ def build_arguments(source: Path, destination: Path, settings: dict) -> list[str
     :raises ValueError: If settings are invalid.
     """
     values = validate("contrast", settings)
-    filters = f"eq=contrast={values['contrast']}" if values["contrast"] != 1 else "null"
-    return filtered_video(source, destination, values, filters)
+    return filtered_video(source, destination, values, contrast_filter(values))

@@ -141,6 +141,10 @@ def validate(operation: str, settings: dict) -> dict:
     :return: Validated copy of the supplied settings, leaving the input unchanged.
     :raises ValueError: If keys, types, ranges, values or output filenames are invalid.
     """
+    if operation == "enhance":
+        from config.pipeline import validate_pipeline
+
+        return validate_pipeline(settings)
     expected = load_default(operation)
     if not isinstance(settings, dict) or settings.keys() != expected.keys():
         raise ValueError("Settings must contain exactly the documented keys")
@@ -148,7 +152,9 @@ def validate(operation: str, settings: dict) -> dict:
         value = settings[key]
         valid = type(value) is type(default)
         if type(default) is float:
-            valid = type(value) in (int, float) and math.isfinite(value)
+            # Python integers are finite even when too large for a C double.
+            # Range checks reject them without overflowing math.isfinite().
+            valid = type(value) in (int, float) and (type(value) is int or math.isfinite(value))
         if not valid:
             raise ValueError(f"Invalid type for {key}")
         if key in RANGES and not RANGES[key][0] <= value <= RANGES[key][1]:
@@ -182,9 +188,15 @@ def load_preset(path: Path, operation: str) -> dict:
     document = json.loads(path.read_text())
     if not isinstance(document, dict) or set(document) != {"version", "operation", "settings"}:
         raise ValueError("Invalid preset structure")
+    if operation == "enhance" and document["operation"] == "enhance" and document["version"] == 1:
+        raise ValueError(
+            "The Enhancement Pipeline preset format changed. Recreate this legacy preset; "
+            "its vibrance adjustment cannot be imported into the new six-stage pipeline."
+        )
+    version = 2 if operation == "enhance" else 1
     if (
         type(document["version"]) is not int
-        or document["version"] != 1
+        or document["version"] != version
         or document["operation"] != operation
     ):
         raise ValueError("Preset version or operation mismatch")
@@ -201,7 +213,11 @@ def save_preset(path: Path, operation: str, settings: dict) -> None:
     :raises ValueError: If the settings are invalid.
     :raises OSError: If the directory or preset cannot be written.
     """
-    document = dict(version=1, operation=operation, settings=validate(operation, settings))
+    document = dict(
+        version=2 if operation == "enhance" else 1,
+        operation=operation,
+        settings=validate(operation, settings),
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2) + "\n")
 

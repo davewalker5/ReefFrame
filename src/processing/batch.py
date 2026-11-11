@@ -9,6 +9,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from config.pipeline import PipelineConfiguration
 from config.settings import validate
 from processing.ffmpeg_runner import CancelledError, FFmpegRunner
 from processing.file_naming import eligible, output_path
@@ -67,6 +68,8 @@ def run_batch(
     :raises ValueError: If batch settings are invalid; per-file errors are returned as outcomes.
     """
     settings = validate(operation, settings)
+    pipeline = PipelineConfiguration.from_settings(settings) if operation == "enhance" else None
+    keep_motion = pipeline.keeps_motion() if pipeline else settings.get("keep_motion", False)
     queue = tuple(Path(source).absolute() for source in sources)
     if trial is not None and (len(queue) != 1 or operation not in TRIAL_OPERATIONS):
         raise ValueError("Trial mode requires one file and a supported correction operation")
@@ -96,7 +99,13 @@ def run_batch(
             if (destination.exists() or destination.is_symlink()) and not settings["overwrite"]:
                 results.append(JobResult(source, "skipped", "Output already exists", destination))
                 continue
-            reason = runner.unavailable(operation, settings["comparison"])
+            if pipeline:
+                effective = settings
+                if trial is not None and settings["audio_policy"] == "copy":
+                    effective = settings | {"audio_policy": "aac"}
+                reason = runner.unavailable(operation, settings["comparison"], effective)
+            else:
+                reason = runner.unavailable(operation, settings["comparison"])
             if reason:
                 raise ValueError(reason)
             metadata = runner.probe(source)
@@ -111,7 +120,7 @@ def run_batch(
                     raise ValueError("Snapshot timestamp is beyond the video duration")
             motion_destination = destination.with_suffix(".trf")
             if (
-                settings.get("keep_motion")
+                keep_motion
                 and (motion_destination.exists() or motion_destination.is_symlink())
                 and not settings["overwrite"]
             ):
@@ -122,20 +131,31 @@ def run_batch(
                 module = importlib.import_module("processing." + operation)
                 phases = (
                     module.build_phases(source, temporary, settings)
-                    if operation == "stabilise"
+                    if operation in ("stabilise", "enhance")
                     else [("Rendering", module.build_arguments(source, temporary, settings))]
                 )
-                for phase, arguments in phases:
+                for phase_index, (phase, arguments) in enumerate(phases):
                     if trial is not None and "-c:a" in arguments:
                         audio_index = arguments.index("-c:a") + 1
                         if arguments[audio_index] == "copy":
                             arguments[audio_index] = "aac"
-                    event(source.name, 0, phase)
+                    phase_label = (
+                        f"{phase} ({phase_index + 1}/{len(phases)})" if pipeline else phase
+                    )
+                    event(
+                        source.name, phase_index * 99 / len(phases) if pipeline else 0, phase_label
+                    )
                     runner.run(
                         trial.apply(arguments, str(source)) if trial is not None else arguments,
                         work,
                         trial.end - trial.start if trial is not None else metadata.duration,
-                        lambda percent: event(source.name, percent, phase),
+                        lambda percent: event(
+                            source.name,
+                            (phase_index + percent / 100) * 99 / len(phases)
+                            if pipeline
+                            else percent,
+                            phase_label,
+                        ),
                         lambda line: event(source.name, -1, line),
                     )
                 if not temporary.is_file() or temporary.stat().st_size == 0:
@@ -143,7 +163,7 @@ def run_batch(
                 runner.probe(temporary)
                 if runner.cancelled.is_set():
                     raise CancelledError("Cancelled")
-                if settings.get("keep_motion"):
+                if keep_motion:
                     publish(work / "motion.trf", motion_destination, settings["overwrite"])
                 publish(temporary, destination, settings["overwrite"])
             results.append(JobResult(source, "completed", "Created output", destination))

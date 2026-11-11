@@ -1,15 +1,46 @@
 {
-  "version": 1,
+  "version": 2,
   "operation": "enhance",
   "settings": {
+    "enabled": [
+      "stabilise",
+      "dehaze",
+      "reduce"
+    ],
+    "stages": {
+      "stabilise": {
+        "shakiness": 5,
+        "accuracy": 5,
+        "smoothing": 15,
+        "optzoom": 1,
+        "keep_motion": false
+      },
+      "dehaze": {
+        "contrast": 1.25,
+        "brightness": -0.02
+      },
+      "colour": {
+        "red_gain": 1.0,
+        "green_gain": 1.0,
+        "blue_gain": 1.0
+      },
+      "gamma": {
+        "gamma": 1.0,
+        "shadow_lift": 0.0,
+        "shadow_range": 0.35
+      },
+      "contrast": {
+        "contrast": 1.0
+      },
+      "reduce": {}
+    },
+    "crf": 18,
+    "preset": "slow",
+    "reduction_crf": 26,
+    "reduction_preset": "slow",
+    "audio_policy": "copy",
     "comparison": false,
     "overwrite": false,
-    "output_name": "",
-    "contrast": 1.3,
-    "brightness": -0.03,
-    "second_contrast": 1.3,
-    "vibrance": 0.3,
-    "crf": 18,
-    "preset": "slow"
+    "output_name": ""
   }
 }
