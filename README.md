@@ -22,35 +22,42 @@ Although developed around GoPro snorkelling footage, ReefFrame is not tied to an
 
 ReefFrame provides a graphical interface for several common video-processing operations:
 
-- **Format conversion** — Convert MOV recordings to MP4
-- **Dehazing** — Adjust contrast and brightness to improve the appearance of underwater footage
-- **Video enhancement** — Apply a combined sequence of contrast, brightness and vibrance adjustments
-- **Stabilisation** — Reduce unwanted camera movement using FFmpeg's two-pass video stabilisation filters
-- **Video compression** — Reduce MP4 file sizes for more convenient storage and distribution
-- **Still image extraction** — Capture individual frames from video recordings as PNG images
-- **Animated GIF creation** — Convert short video clips into animated GIFs
+| Operation                          | Description                                                                                                                                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enhancement Pipeline               | Select and combine stabilisation, dehazing, colour correction, gamma and shadow adjustments, contrast enhancement and file-size reduction in a configurable workflow |
+| Convert MOV to MP4                 | Convert MOV recordings to MP4                                                                                                                                        |
+| Dehaze                             | Adjust contrast and brightness to improve the appearance of underwater footage                                                                                       |
+| Colour Correction                  | Adjust red, green and blue channel gains to reduce unwanted colour casts                                                                                             |
+| Gamma Correction and Shadow Uplift | Adjust midtones and selectively brighten darker regions while limiting changes to highlights                                                                         |
+| Contrast Enhancement               | Adjust video contrast independently of the enhancement pipeline                                                                                                      |
+| Stabilise                          | Reduce unwanted camera movement using FFmpeg's two-pass video stabilisation filters                                                                                  |
+| Reduce Size                        | Compress MP4 recordings to reduce file size                                                                                                                          |
+| Extract a Frame as a Still Image   | Capture individual frames from video recordings as PNG images                                                                                                        |
+| Convert to Animated GIF            | Convert short video clips into animated GIFs                                                                                                                         |
 
-Processing parameters can be adjusted through individual operation dialogs and saved as JSON presets for reuse. Operations can be applied to individual recordings or batches of files, with progress reporting and error handling.
+The enhancement pipeline allows users to choose which processing stages to apply and configure their settings in one dialog. Selected stages run in a fixed order, with a single final video encode rather than separate encoded files for each stage. When stabilisation is selected, a separate motion-analysis pass is also required.
 
-The application uses FFmpeg as its processing engine, including the additional stabilisation capabilities provided by builds incorporating `libvidstab`.
+Processing parameters can be adjusted through per-operation settings dialogs and saved as reusable JSON presets. _ReefFrame_ also remembers the last-selected pipeline stages, pipeline settings and standalone operation settings between sessions, as well as the last directory used for loading or saving presets.
+
+Operations can be applied to individual recordings or batches of files, with progress reporting and error handling. Manual MP4 output filenames are given a `.mp4` extension when needed.
+
+The application uses _FFmpeg_ as its processing engine, including the additional stabilisation capabilities provided by builds incorporating `libvidstab`.
 
 ## What ReefFrame Doesn't Do
 
 ReefFrame is **not intended to be a general-purpose video editor**. It does not provide a timeline, clip sequencing, transitions, audio editing or the other facilities normally associated with a full video-editing application.
 
-Nor does it attempt to perform sophisticated underwater image restoration. Its dehazing and enhancement operations use conventional image adjustments rather than algorithms that physically model and reverse the effects of light absorption and scattering underwater. They can improve the appearance of footage, but cannot recover detail that was never captured.
+Nor does it attempt to perform sophisticated underwater image restoration. Its dehazing, colour correction and tonal enhancement operations use conventional image adjustments rather than algorithms that physically model and reverse the effects of light absorption and scattering underwater. They can improve the appearance of footage, but cannot recover detail that was never captured.
 
 Similarly, stabilisation can reduce unwanted movement, but cannot eliminate every camera shake or compensate for severe motion blur.
 
-ReefFrame does not include facilities for publishing videos to social media or other online services. It concentrates on **preparing and improving footage**, leaving subsequent editing, presentation and publication to other tools.
+_ReefFrame_ does not include facilities for publishing videos to social media or other online services. It concentrates on preparing and improving footage, leaving subsequent editing, presentation and publication to other tools.
 
-## Philosophy
+## Design Philosophy
 
-ReefFrame is deliberately focused on doing a relatively small number of useful things well.
+_ReefFrame_ is deliberately focused on doing a relatively small number of useful things well.
 
 It provides a convenient, repeatable way to process underwater recordings without requiring users to construct FFmpeg commands themselves, while retaining control over the processing parameters.
-
-Its origins are quite practical: helping to make the most of footage from some memorable encounters beneath the surface of the Indian Ocean.
 
 ## Getting Started
 
