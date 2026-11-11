@@ -73,6 +73,9 @@ class BaseOperationDialog(QDialog):
             "A filename only; the output extension is added automatically if needed. "
             "For batches, leave blank to retain each source stem."
         )
+        self.error = QLabel()
+        self.error.setWordWrap(True)
+        layout.addWidget(self.error)
         row = QHBoxLayout()
         for label, callback in (
             ("Load default", self.restore_defaults),
@@ -82,16 +85,14 @@ class BaseOperationDialog(QDialog):
             button = QPushButton(label)
             button.clicked.connect(callback)
             row.addWidget(button)
-        layout.addLayout(row)
-        self.error = QLabel()
-        self.error.setWordWrap(True)
-        layout.addWidget(self.error)
+        row.addStretch()
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        row.addWidget(buttons)
+        layout.addLayout(row)
         self.set_values(remembered_values)
 
     def add_form_container(self, layout: QVBoxLayout) -> None:

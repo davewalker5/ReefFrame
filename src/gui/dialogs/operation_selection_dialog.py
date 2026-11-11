@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QPushButton,
     QVBoxLayout,
@@ -50,14 +51,17 @@ class OperationSelectionDialog(QDialog):
         layout.addWidget(self.error)
         load = QPushButton("Load preset")
         load.clicked.connect(self.import_preset)
-        layout.addWidget(load)
+        row = QHBoxLayout()
+        row.addWidget(load)
+        row.addStretch()
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Continue")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        row.addWidget(buttons)
+        layout.addLayout(row)
 
     def import_preset(self) -> None:
         """Load a validated pipeline preset without partially changing selections."""
