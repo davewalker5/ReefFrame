@@ -2,7 +2,7 @@
 
 import pytest
 
-from config.settings import OPERATIONS, load_default
+from config.settings import OPERATION_LABELS, OPERATIONS, load_default
 from gui.main_window import DIALOGS
 
 
@@ -15,6 +15,7 @@ def test_dialogs(application, operation):
     :param operation: Registered operation name used to select defaults and processing behaviour.
     """
     dialog = DIALOGS[operation]()
+    assert dialog.windowTitle() == f"{OPERATION_LABELS[operation]} settings — ReefFrame"
     assert dialog.settings() == load_default(operation)
     dialog.controls["overwrite"].setChecked(True)
     dialog.restore_defaults()
@@ -41,7 +42,7 @@ def test_selection_and_worker_state(application, tmp_path, monkeypatch):
     for name in ("a.mp4", "b.mp4", "z.MOV"):
         (tmp_path / name).touch()
     window.folder = tmp_path
-    window.operation.setCurrentText("reduce")
+    window.operation.setCurrentIndex(window.operation.findData("reduce"))
     window.refresh()
     window.table.selectRow(1)
     assert window.selected_paths() == [tmp_path / "b.mp4"]
@@ -103,7 +104,7 @@ def test_operation_changes_preserve_selection(
     expected = {tmp_path / name for name in selected_names}
     assert set(window.selected_paths()) == expected
     for operation in ("enhance", "convert", "reduce", "snapshot", "stabilise"):
-        window.operation.setCurrentText(operation)
+        window.operation.setCurrentIndex(window.operation.findData(operation))
         assert set(window.selected_paths()) == expected
     window.refresh()
     assert set(window.selected_paths()) == expected
@@ -175,8 +176,10 @@ def test_operation_selection_opens_dialog(
         unavailable=lambda *args: "",
         probe=lambda *args: SimpleNamespace(duration=1.0),
     )
-    window.operation.setCurrentText(operation)
+    window.operation.setCurrentIndex(window.operation.findData(operation))
     window.refresh()
+    assert window.operation.currentText() == OPERATION_LABELS[operation]
+    assert window.operation.currentData() == operation
     assert window.table.item(0, 3).text() == "Eligible"
     window.table.selectRow(0)
     opened = []

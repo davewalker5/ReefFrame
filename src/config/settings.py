@@ -21,6 +21,17 @@ OPERATIONS = (
     "gamma",
     "colour",
 )
+OPERATION_LABELS = {
+    "convert": "Convert MOV to MP4",
+    "dehaze": "Dehaze",
+    "enhance": "Enhancement Pipeline",
+    "reduce": "Reduce Size",
+    "gif": "Convert to Animated GIF",
+    "snapshot": "Extract a Frame as a Still Image",
+    "stabilise": "Stabilise",
+    "gamma": "Gamma Correction and Shadow Uplift",
+    "colour": "Colour Correction",
+}
 RANGES = {
     "gamma": (0.1, 3.0),
     "shadow_lift": (0.0, 0.5),

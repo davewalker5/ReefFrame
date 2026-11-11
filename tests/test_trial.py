@@ -148,7 +148,7 @@ def test_trial_selection_context(application, tmp_path, monkeypatch, all_eligibl
     for name in ("a.mp4", "b.mp4"):
         (tmp_path / name).touch()
     window.folder = tmp_path
-    window.operation.setCurrentText("enhance")
+    window.operation.setCurrentIndex(window.operation.findData("enhance"))
     window.refresh()
     window.table.clearSelection()
     for row in range(count):

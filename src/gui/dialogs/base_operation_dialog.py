@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from config.settings import (
     CHOICES,
+    OPERATION_LABELS,
     RANGES,
     load_default,
     load_preset,
@@ -51,9 +52,7 @@ class BaseOperationDialog(QDialog):
         self.operation = operation
         self.values = load_default(operation)
         self.controls = {}
-        self.setWindowTitle(
-            f"{operation.title()} settings — ReefFrame"
-        )
+        self.setWindowTitle(f"{OPERATION_LABELS[operation]} settings — ReefFrame")
         self.setMinimumWidth(480)
         layout = QVBoxLayout(self)
         self.form = QFormLayout()
