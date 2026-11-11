@@ -106,6 +106,7 @@ class FFmpegRunner:
         """
         required = {
             "dehaze": ["eq"],
+            "contrast": ["eq"],
             "gamma": ["eq", "scale", "format", "lutyuv"],
             "colour": ["colorchannelmixer"],
             "enhance": ["eq", "vibrance"],

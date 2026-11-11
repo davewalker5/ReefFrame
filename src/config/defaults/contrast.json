@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "operation": "contrast",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "contrast": 1.0,
+    "crf": 18,
+    "preset": "slow"
+  }
+}

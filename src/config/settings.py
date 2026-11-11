@@ -20,8 +20,10 @@ OPERATIONS = (
     "stabilise",
     "gamma",
     "colour",
+    "contrast",
 )
 OPERATION_LABELS = {
+    "contrast": "Contrast Enhancement",
     "convert": "Convert MOV to MP4",
     "dehaze": "Dehaze",
     "enhance": "Enhancement Pipeline",

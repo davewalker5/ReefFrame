@@ -13,7 +13,7 @@ from processing.batch import run_batch
 from processing.ffmpeg_runner import FFmpegRunner
 
 
-@pytest.mark.parametrize("operation", ["gamma", "colour"])
+@pytest.mark.parametrize("operation", ["gamma", "colour", "contrast"])
 def test_neutral_filter(operation):
     """Neutral controls bypass all intentional correction filters.
 
@@ -131,6 +131,7 @@ def test_blue_gain():
     [
         ("gamma", {"gamma": 1.2, "shadow_lift": 0.2}),
         ("colour", {"blue_gain": 0.7, "red_gain": 1.1}),
+        ("contrast", {"contrast": 1.3}),
     ],
 )
 def test_correction_batch(clip, operation, changes):
@@ -213,3 +214,22 @@ def test_preset_import_and_failed_selection(application, tmp_path, monkeypatch):
     dialog.export_preset()
     assert settings.preset_directory(tmp_path) == imported.parent
     dialog.close()
+
+
+def test_contrast_transfer():
+    """Standalone contrast expands tones about the midpoint without changing chroma."""
+    pixels = bytes(range(256)) + bytes([128] * 512)
+    result = render_pixels("contrast", {"contrast": 1.3}, pixels, "yuv444p")
+    assert result[70] < 70
+    assert result[180] > 180
+    assert result[256:] == pixels[256:]
+
+
+def test_contrast_filter_is_independent():
+    """Contrast requests only EQ contrast, leaving the Enhance chain independent."""
+    from processing.contrast import build_arguments
+
+    arguments = build_arguments(
+        Path("in.mp4"), Path("out.mp4"), load_default("contrast") | {"contrast": 1.3}
+    )
+    assert arguments[arguments.index("-vf") + 1] == "eq=contrast=1.3"

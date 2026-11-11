@@ -3,6 +3,7 @@
 from pathlib import Path
 
 SUFFIXES = {
+    "contrast": "-contrast",
     "gamma": "-gamma",
     "colour": "-colour-corrected",
     "convert": "",
