@@ -2,7 +2,7 @@
 
 import pytest
 
-from config.settings import load_default
+from config.settings import OPERATIONS, load_default
 from processing.file_naming import eligible, output_path, scan
 
 
@@ -56,3 +56,41 @@ def test_reprocess_outputs(tmp_path, suffix, operation):
     assert not eligible(source, "convert")
     destination = output_path(source, operation, load_default(operation))
     assert destination != source
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("name", ["custom", "custom.v2", "custom.MP4", "custom.mp4"])
+def test_manual_output_extension(tmp_path, operation, name):
+    """Append the correct extension without replacing user text or duplicating suffixes.
+
+    :param tmp_path: Isolated test folder.
+    :param operation: Registered processing operation.
+    :param name: Manually entered filename.
+    """
+    extension = {"gif": ".gif", "snapshot": ".png"}.get(operation, ".mp4")
+    expected = name if name.lower().endswith(extension) else name + extension
+    settings = load_default(operation) | {"output_name": name}
+    assert output_path(tmp_path / "source.mp4", operation, settings).name == expected
+
+
+@pytest.mark.parametrize("operation,extension", [("gif", ".gif"), ("snapshot", ".png")])
+def test_existing_image_extension(tmp_path, operation, extension):
+    """Preserve matching image output extensions regardless of case.
+
+    :param tmp_path: Isolated test folder.
+    :param operation: Image-producing operation.
+    :param extension: Expected image file suffix.
+    """
+    name = "custom" + extension.upper()
+    settings = load_default(operation) | {"output_name": name}
+    assert output_path(tmp_path / "source.mp4", operation, settings).name == name
+
+
+def test_extension_completion_preserves_source_protection(tmp_path):
+    """Reject a manual stem that becomes the source path after extension completion.
+
+    :param tmp_path: Isolated test folder.
+    """
+    settings = load_default("gamma") | {"output_name": "source", "overwrite": True}
+    with pytest.raises(ValueError, match="source"):
+        output_path(tmp_path / "source.mp4", "gamma", settings)

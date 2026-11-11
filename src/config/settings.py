@@ -8,10 +8,26 @@ import sys
 from importlib.resources import files
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QSettings, QStandardPaths
 
-OPERATIONS = ("convert", "dehaze", "enhance", "reduce", "gif", "snapshot", "stabilise")
+OPERATIONS = (
+    "convert",
+    "dehaze",
+    "enhance",
+    "reduce",
+    "gif",
+    "snapshot",
+    "stabilise",
+    "gamma",
+    "colour",
+)
 RANGES = {
+    "gamma": (0.1, 3.0),
+    "shadow_lift": (0.0, 0.5),
+    "shadow_range": (0.05, 1.0),
+    "red_gain": (0.0, 2.0),
+    "green_gain": (0.0, 2.0),
+    "blue_gain": (0.0, 2.0),
     "crf": (0, 51),
     "contrast": (0, 3),
     "second_contrast": (0, 3),
@@ -61,16 +77,19 @@ def log_directory() -> Path:
 
     :return: Log directory; it may not exist yet.
     """
-    return Path(
-        QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
-    ) / "logs"
+    return (
+        Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
+        / "logs"
+    )
 
 
 def migrate_user_settings() -> None:
     """Copy legacy preferences and presets when their new locations do not exist."""
-    legacy = Path.home() / (
-        "Library/Application Support" if sys.platform == "darwin" else ".config"
-    ) / "ReefFrame"
+    legacy = (
+        Path.home()
+        / ("Library/Application Support" if sys.platform == "darwin" else ".config")
+        / "ReefFrame"
+    )
     destination = user_directory()
     if legacy == destination:
         return
@@ -172,3 +191,25 @@ def save_preset(path: Path, operation: str, settings: dict) -> None:
     document = dict(version=1, operation=operation, settings=validate(operation, settings))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+def preset_directory(fallback: Path) -> Path:
+    """Return the remembered preset folder when it remains available.
+
+    :param fallback: Existing default location for this dialog.
+    :return: Valid remembered directory or the supplied fallback.
+    """
+    preferences = QSettings(str(user_directory() / "preferences.ini"), QSettings.Format.IniFormat)
+    stored = preferences.value("preset_directory", "")
+    directory = Path(str(stored)) if stored else None
+    return directory if directory is not None and directory.is_dir() else fallback
+
+
+def remember_preset_directory(path: Path) -> None:
+    """Persist the parent of a successfully loaded or saved preset.
+
+    :param path: Successfully used preset file path.
+    """
+    preferences = QSettings(str(user_directory() / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences.setValue("preset_directory", str(path.resolve().parent))
+    preferences.sync()

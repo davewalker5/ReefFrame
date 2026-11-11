@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "operation": "colour",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "red_gain": 1.0,
+    "green_gain": 1.0,
+    "blue_gain": 1.0,
+    "crf": 18,
+    "preset": "slow"
+  }
+}

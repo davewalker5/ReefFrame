@@ -69,7 +69,7 @@ def run_batch(
     settings = validate(operation, settings)
     queue = tuple(Path(source).absolute() for source in sources)
     if trial is not None and (len(queue) != 1 or operation not in TRIAL_OPERATIONS):
-        raise ValueError("Trial mode requires one file and Dehaze, Enhance or Stabilise")
+        raise ValueError("Trial mode requires one file and a supported correction operation")
     results = []
     destinations = set()
     source_paths = {str(path.resolve()).casefold() for path in queue}

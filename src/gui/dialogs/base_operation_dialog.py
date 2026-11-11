@@ -27,6 +27,8 @@ from config.settings import (
     RANGES,
     load_default,
     load_preset,
+    preset_directory,
+    remember_preset_directory,
     save_preset,
     user_directory,
     validate,
@@ -49,7 +51,9 @@ class BaseOperationDialog(QDialog):
         self.operation = operation
         self.values = load_default(operation)
         self.controls = {}
-        self.setWindowTitle(f"{operation.title()} settings — ReefFrame")
+        self.setWindowTitle(
+            f"{operation.title()} settings — ReefFrame"
+        )
         self.setMinimumWidth(480)
         layout = QVBoxLayout(self)
         self.form = QFormLayout()
@@ -67,7 +71,8 @@ class BaseOperationDialog(QDialog):
         self.add_field("overwrite", "Overwrite existing outputs")
         self.add_field("output_name", "Output filename (blank = automatic)")
         self.controls["output_name"].setToolTip(
-            "A filename only. For batches, leave blank to retain each source stem."
+            "A filename only; the output extension is added automatically if needed. "
+            "For batches, leave blank to retain each source stem."
         )
         row = QHBoxLayout()
         for label, callback in (
@@ -270,17 +275,18 @@ class BaseOperationDialog(QDialog):
     def import_preset(self) -> None:
         """Import a named JSON preset, displaying invalid data errors."""
         name, _ = QFileDialog.getOpenFileName(
-            self, "Load preset", str(user_directory()), "JSON (*.json)"
+            self, "Load preset", str(preset_directory(user_directory())), "JSON (*.json)"
         )
         if name:
             try:
                 self.set_values(load_preset(Path(name), self.operation))
+                remember_preset_directory(Path(name))
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Cannot load preset", str(error))
 
     def export_preset(self) -> None:
         """Export validated settings to a user-selected JSON file."""
-        directory = user_directory() / "presets"
+        directory = preset_directory(user_directory() / "presets")
         directory.mkdir(parents=True, exist_ok=True)
         name, _ = QFileDialog.getSaveFileName(
             self, "Save preset", str(directory / (self.operation + ".json")), "JSON (*.json)"
@@ -288,5 +294,6 @@ class BaseOperationDialog(QDialog):
         if name:
             try:
                 save_preset(Path(name), self.operation, self.settings())
+                remember_preset_directory(Path(name))
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Cannot save preset", str(error))

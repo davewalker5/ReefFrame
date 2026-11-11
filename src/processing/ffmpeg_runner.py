@@ -106,6 +106,8 @@ class FFmpegRunner:
         """
         required = {
             "dehaze": ["eq"],
+            "gamma": ["eq", "scale", "format", "lutyuv"],
+            "colour": ["colorchannelmixer"],
             "enhance": ["eq", "vibrance"],
             "gif": ["fps", "scale", "palettegen", "paletteuse"],
             "stabilise": ["vidstabdetect", "vidstabtransform"],

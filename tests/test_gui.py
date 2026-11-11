@@ -147,3 +147,41 @@ def test_double_click_opens_video(application, tmp_path, monkeypatch, launch_suc
     assert len(opened) == 1
     assert len(warnings) == (1 if launch_succeeds else 2)
     window.hide()
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("all_eligible", [False, True])
+def test_operation_selection_opens_dialog(
+    application, tmp_path, monkeypatch, operation, all_eligible
+):
+    """Resolve plain operation names to settings for both processing actions.
+
+    :param application: Shared offscreen Qt application fixture.
+    :param tmp_path: Isolated folder containing an eligible input.
+    :param monkeypatch: Attribute patch fixture.
+    :param operation: Registered operation selected in the combo box.
+    :param all_eligible: Whether to process the folder or selected file.
+    """
+    from types import SimpleNamespace
+
+    from gui.main_window import MainWindow
+
+    monkeypatch.setattr(MainWindow, "check_dependencies", lambda self: None)
+    window = MainWindow()
+    source = tmp_path / ("source.mov" if operation == "convert" else "source.mp4")
+    source.touch()
+    window.folder = tmp_path
+    window.runner = SimpleNamespace(
+        unavailable=lambda *args: "",
+        probe=lambda *args: SimpleNamespace(duration=1.0),
+    )
+    window.operation.setCurrentText(operation)
+    window.refresh()
+    assert window.table.item(0, 3).text() == "Eligible"
+    window.table.selectRow(0)
+    opened = []
+    monkeypatch.setattr(DIALOGS[operation], "exec", lambda self: opened.append(self.operation) or 0)
+    window.start_batch(all_eligible)
+    assert opened == [operation]
+    assert window.worker is None
+    window.close()

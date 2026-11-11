@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass
 
-TRIAL_OPERATIONS = ("dehaze", "enhance", "stabilise")
+TRIAL_OPERATIONS = ("dehaze", "enhance", "stabilise", "gamma", "colour")
 
 
 @dataclass(frozen=True)
