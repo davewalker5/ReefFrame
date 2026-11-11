@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from config.pipeline import PipelineConfiguration
-from config.settings import validate
+from config.settings import save_preset, validate
 from processing.ffmpeg_runner import CancelledError, FFmpegRunner
 from processing.file_naming import eligible, output_path
 from processing.trial import TRIAL_OPERATIONS, TrialRange
+
+PRESET_OPERATIONS = frozenset({"dehaze", "enhance", "stabilise", "gamma", "colour", "contrast"})
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,13 @@ def run_batch(
             if (destination.exists() or destination.is_symlink()) and not settings["overwrite"]:
                 results.append(JobResult(source, "skipped", "Output already exists", destination))
                 continue
+            preset_destination = destination.with_suffix(".json")
+            if (
+                operation in PRESET_OPERATIONS
+                and (preset_destination.exists() or preset_destination.is_symlink())
+                and not settings["overwrite"]
+            ):
+                raise FileExistsError(f"Preset already exists: {preset_destination}")
             if pipeline:
                 effective = settings
                 if trial is not None and settings["audio_policy"] == "copy":
@@ -163,6 +172,10 @@ def run_batch(
                 runner.probe(temporary)
                 if runner.cancelled.is_set():
                     raise CancelledError("Cancelled")
+                if operation in PRESET_OPERATIONS:
+                    preset_temporary = work / "preset.json"
+                    save_preset(preset_temporary, operation, settings)
+                    publish(preset_temporary, preset_destination, settings["overwrite"])
                 if keep_motion:
                     publish(work / "motion.trf", motion_destination, settings["overwrite"])
                 publish(temporary, destination, settings["overwrite"])
