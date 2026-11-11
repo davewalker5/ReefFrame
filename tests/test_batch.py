@@ -1,12 +1,79 @@
 """Real generated-media coverage for all operations and comparison modes."""
 
 import shutil
+from threading import Event
+from types import SimpleNamespace
 
 import pytest
 
-from config.settings import OPERATIONS, load_default
-from processing.batch import run_batch
+from config.settings import OPERATIONS, load_default, load_preset
+from processing.batch import PRESET_OPERATIONS, run_batch
 from processing.ffmpeg_runner import FFmpegRunner
+from processing.file_naming import output_path
+from processing.trial import TrialRange
+
+
+@pytest.mark.parametrize("operation", sorted(PRESET_OPERATIONS))
+@pytest.mark.parametrize("trial", [None, TrialRange(0, 0.5)])
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_per_output_preset(tmp_path, operation, trial, overwrite):
+    """Save importable settings beside custom outputs, including trial outputs.
+
+    :param tmp_path: Isolated output directory.
+    :param operation: Correction operation under test.
+    :param trial: Optional trial interval.
+    :param overwrite: Whether existing output and preset files should be replaced.
+    """
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+    settings = load_default(operation) | {"output_name": "custom.mp4", "overwrite": overwrite}
+    destination = output_path(source, operation, settings)
+    if trial is not None:
+        destination = destination.with_stem(destination.stem + trial.suffix())
+    if overwrite:
+        destination.write_bytes(b"previous output")
+        destination.with_suffix(".json").write_text("previous preset")
+
+    def render(arguments, work, *args):
+        """Create simulated render and motion outputs for each processing phase.
+
+        :param arguments: FFmpeg arguments, ending with the output path.
+        :param work: Temporary work directory.
+        :param args: Unused progress and logging arguments.
+        """
+        if arguments[-1] != "-":
+            (work / arguments[-1]).write_bytes(b"rendered")
+        (work / "motion.trf").write_bytes(b"motion")
+
+    runner = SimpleNamespace(
+        cancelled=Event(),
+        unavailable=lambda *args: None,
+        probe=lambda path: SimpleNamespace(duration=1),
+        run=render,
+    )
+    result = run_batch([source], operation, settings, runner, lambda *args: None, trial=trial)[0]
+    assert result.status == "completed", result.message
+    preset = result.output.with_suffix(".json")
+    assert load_preset(preset, operation) == settings
+
+
+def test_existing_preset_is_preserved(tmp_path):
+    """An existing sidecar blocks rendering unless overwrite is enabled.
+
+    :param tmp_path: Isolated output directory.
+    """
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+    settings = load_default("gamma")
+    destination = output_path(source, "gamma", settings)
+    preset = destination.with_suffix(".json")
+    preset.write_text("existing preset")
+    runner = SimpleNamespace(cancelled=Event())
+    result = run_batch([source], "gamma", settings, runner, lambda *args: None)[0]
+    assert result.status == "failed"
+    assert "Preset already exists" in result.message
+    assert preset.read_text() == "existing preset"
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize("operation", OPERATIONS)
@@ -40,6 +107,11 @@ def test_integration(clip, operation, comparison):
     assert progress_events[-1] == (source.name, 100, "Completed")
     output = result[0].output
     assert output.stat().st_size > 0
+    preset = output.with_suffix(".json")
+    if operation in PRESET_OPERATIONS:
+        assert load_preset(preset, operation) == settings
+    else:
+        assert not preset.exists()
     metadata = runner.probe(output)
     if operation not in ("gif", "snapshot"):
         assert metadata.audio == runner.probe(source).audio
