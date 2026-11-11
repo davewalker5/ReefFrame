@@ -6,10 +6,8 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -17,20 +15,22 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
+from config.preferences import load_operation_settings, remember_operation_settings
 from config.settings import (
-    CHOICES,
-    RANGES,
+    OPERATION_LABELS,
     load_default,
     load_preset,
+    preset_directory,
+    remember_preset_directory,
     save_preset,
     user_directory,
     validate,
 )
+from gui.dialogs.fields import control_value, parameter_control, set_control_value
 from processing.trial import TRIAL_OPERATIONS, TrialRange
 
 
@@ -47,13 +47,16 @@ class BaseOperationDialog(QDialog):
         """
         super().__init__(parent)
         self.operation = operation
+        # Widget types come from the immutable schema, not saved numeric values:
+        # presets may legitimately represent float parameters as JSON integers.
         self.values = load_default(operation)
+        remembered_values = load_operation_settings(operation)
         self.controls = {}
-        self.setWindowTitle(f"{operation.title()} settings — ReefFrame")
+        self.setWindowTitle(f"{OPERATION_LABELS[operation]} settings — ReefFrame")
         self.setMinimumWidth(480)
         layout = QVBoxLayout(self)
         self.form = QFormLayout()
-        layout.addLayout(self.form)
+        self.add_form_container(layout)
         self.build_parameters()
         if operation not in ("snapshot", "gif", "reduce"):
             self.add_field("comparison", "Original left / processed right")
@@ -67,7 +70,8 @@ class BaseOperationDialog(QDialog):
         self.add_field("overwrite", "Overwrite existing outputs")
         self.add_field("output_name", "Output filename (blank = automatic)")
         self.controls["output_name"].setToolTip(
-            "A filename only. For batches, leave blank to retain each source stem."
+            "A filename only; the output extension is added automatically if needed. "
+            "For batches, leave blank to retain each source stem."
         )
         row = QHBoxLayout()
         for label, callback in (
@@ -88,7 +92,14 @@ class BaseOperationDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        self.set_values(self.values)
+        self.set_values(remembered_values)
+
+    def add_form_container(self, layout: QVBoxLayout) -> None:
+        """Place settings content above the common preset and confirmation actions.
+
+        :param layout: Dialog layout receiving the form or a subclass's scroll container.
+        """
+        layout.addLayout(self.form)
 
     def build_trial_controls(self) -> None:
         """Add per-run trial controls, disabled until a single source is supplied."""
@@ -191,21 +202,7 @@ class BaseOperationDialog(QDialog):
         :param key: Settings key identifying the control and its default value.
         :param label: Visible, accessible label for the parameter control.
         """
-        default = self.values[key]
-        if key in CHOICES:
-            control = QComboBox()
-            control.addItems(CHOICES[key])
-        elif isinstance(default, bool):
-            control = QCheckBox()
-        elif isinstance(default, (int, float)):
-            control = QDoubleSpinBox() if isinstance(default, float) else QSpinBox()
-            control.setRange(*RANGES[key])
-            if isinstance(default, float):
-                control.setDecimals(3)
-                control.setSingleStep(0.01)
-            control.setToolTip(f"Allowed range: {RANGES[key][0]} to {RANGES[key][1]}")
-        else:
-            control = QLineEdit()
+        control = parameter_control(key, self.values[key], label)
         self.controls[key] = control
         self.form.addRow(label, control)
 
@@ -219,15 +216,7 @@ class BaseOperationDialog(QDialog):
         for key, value in validate(self.operation, values).items():
             if key not in self.controls:
                 continue
-            control = self.controls[key]
-            if isinstance(control, QComboBox):
-                control.setCurrentText(value)
-            elif isinstance(control, QCheckBox):
-                control.setChecked(value)
-            elif isinstance(control, (QSpinBox, QDoubleSpinBox)):
-                control.setValue(value)
-            else:
-                control.setText(value)
+            set_control_value(self.controls[key], value)
 
     def settings(self) -> dict:
         """
@@ -239,22 +228,16 @@ class BaseOperationDialog(QDialog):
         """
         values = load_default(self.operation)
         for key, control in self.controls.items():
-            if isinstance(control, QComboBox):
-                values[key] = control.currentText()
-            elif isinstance(control, QCheckBox):
-                values[key] = control.isChecked()
-            elif isinstance(control, (QSpinBox, QDoubleSpinBox)):
-                values[key] = control.value()
-            else:
-                values[key] = control.text()
+            values[key] = control_value(control)
         return validate(self.operation, values)
 
     def accept(self) -> None:
         """Keep the dialog open and display actionable validation errors."""
         try:
-            self.settings()
+            values = self.settings()
             self.trial_range()
-        except ValueError as error:
+            remember_operation_settings(self.operation, values)
+        except (ValueError, OSError) as error:
             self.error.setText(str(error))
             return
         super().accept()
@@ -270,17 +253,18 @@ class BaseOperationDialog(QDialog):
     def import_preset(self) -> None:
         """Import a named JSON preset, displaying invalid data errors."""
         name, _ = QFileDialog.getOpenFileName(
-            self, "Load preset", str(user_directory()), "JSON (*.json)"
+            self, "Load preset", str(preset_directory(user_directory())), "JSON (*.json)"
         )
         if name:
             try:
                 self.set_values(load_preset(Path(name), self.operation))
+                remember_preset_directory(Path(name))
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Cannot load preset", str(error))
 
     def export_preset(self) -> None:
         """Export validated settings to a user-selected JSON file."""
-        directory = user_directory() / "presets"
+        directory = preset_directory(user_directory() / "presets")
         directory.mkdir(parents=True, exist_ok=True)
         name, _ = QFileDialog.getSaveFileName(
             self, "Save preset", str(directory / (self.operation + ".json")), "JSON (*.json)"
@@ -288,5 +272,6 @@ class BaseOperationDialog(QDialog):
         if name:
             try:
                 save_preset(Path(name), self.operation, self.settings())
+                remember_preset_directory(Path(name))
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Cannot save preset", str(error))

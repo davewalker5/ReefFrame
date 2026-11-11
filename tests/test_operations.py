@@ -36,7 +36,5 @@ def test_commands(operation, comparison):
     if operation in ("dehaze", "enhance", "reduce"):
         assert "copy" in args
     if operation == "enhance":
-        assert (
-            "eq=contrast=1.3:brightness=-0.03,eq=contrast=1.3,vibrance=intensity=0.3"
-            in " ".join(args)
-        )
+        assert "eq=contrast=1.25:brightness=-0.02" in " ".join(args)
+        assert "vibrance" not in " ".join(args)

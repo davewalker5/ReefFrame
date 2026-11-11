@@ -2,7 +2,7 @@
 
 import pytest
 
-from config.settings import OPERATIONS, load_default
+from config.settings import OPERATION_LABELS, OPERATIONS, load_default
 from gui.main_window import DIALOGS
 
 
@@ -15,6 +15,7 @@ def test_dialogs(application, operation):
     :param operation: Registered operation name used to select defaults and processing behaviour.
     """
     dialog = DIALOGS[operation]()
+    assert dialog.windowTitle() == f"{OPERATION_LABELS[operation]} settings — ReefFrame"
     assert dialog.settings() == load_default(operation)
     dialog.controls["overwrite"].setChecked(True)
     dialog.restore_defaults()
@@ -41,7 +42,7 @@ def test_selection_and_worker_state(application, tmp_path, monkeypatch):
     for name in ("a.mp4", "b.mp4", "z.MOV"):
         (tmp_path / name).touch()
     window.folder = tmp_path
-    window.operation.setCurrentText("reduce")
+    window.operation.setCurrentIndex(window.operation.findData("reduce"))
     window.refresh()
     window.table.selectRow(1)
     assert window.selected_paths() == [tmp_path / "b.mp4"]
@@ -103,7 +104,7 @@ def test_operation_changes_preserve_selection(
     expected = {tmp_path / name for name in selected_names}
     assert set(window.selected_paths()) == expected
     for operation in ("enhance", "convert", "reduce", "snapshot", "stabilise"):
-        window.operation.setCurrentText(operation)
+        window.operation.setCurrentIndex(window.operation.findData(operation))
         assert set(window.selected_paths()) == expected
     window.refresh()
     assert set(window.selected_paths()) == expected
@@ -147,3 +148,43 @@ def test_double_click_opens_video(application, tmp_path, monkeypatch, launch_suc
     assert len(opened) == 1
     assert len(warnings) == (1 if launch_succeeds else 2)
     window.hide()
+
+
+@pytest.mark.parametrize("operation", OPERATIONS)
+@pytest.mark.parametrize("all_eligible", [False, True])
+def test_operation_selection_opens_dialog(
+    application, tmp_path, monkeypatch, operation, all_eligible
+):
+    """Resolve plain operation names to settings for both processing actions.
+
+    :param application: Shared offscreen Qt application fixture.
+    :param tmp_path: Isolated folder containing an eligible input.
+    :param monkeypatch: Attribute patch fixture.
+    :param operation: Registered operation selected in the combo box.
+    :param all_eligible: Whether to process the folder or selected file.
+    """
+    from types import SimpleNamespace
+
+    from gui.main_window import MainWindow
+
+    monkeypatch.setattr(MainWindow, "check_dependencies", lambda self: None)
+    window = MainWindow()
+    source = tmp_path / ("source.mov" if operation == "convert" else "source.mp4")
+    source.touch()
+    window.folder = tmp_path
+    window.runner = SimpleNamespace(
+        unavailable=lambda *args: "",
+        probe=lambda *args: SimpleNamespace(duration=1.0),
+    )
+    window.operation.setCurrentIndex(window.operation.findData(operation))
+    window.refresh()
+    assert window.operation.currentText() == OPERATION_LABELS[operation]
+    assert window.operation.currentData() == operation
+    assert window.table.item(0, 3).text() == "Eligible"
+    window.table.selectRow(0)
+    opened = []
+    monkeypatch.setattr(DIALOGS[operation], "exec", lambda self: opened.append(self.operation) or 0)
+    window.start_batch(all_eligible)
+    assert opened == [operation]
+    assert window.worker is None
+    window.close()

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QListView,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -25,7 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.settings import OPERATIONS, user_directory
+from config.settings import OPERATION_LABELS, OPERATIONS, user_directory
+from gui.operation_delegate import OperationDelegate
 from gui.workers import BatchWorker
 from processing.ffmpeg_runner import FFmpegRunner
 from processing.file_naming import eligible, scan
@@ -115,11 +117,15 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.table, 1)
         controls = QHBoxLayout()
         self.operation = QComboBox()
-        self.operation.setStyleSheet(
-            "QComboBox { background-color: #123f49; color: #e5faf7; "
-            "border: 1px solid #277079; border-radius: 4px; padding: 5px 10px; }"
-        )
-        self.operation.addItems(OPERATIONS)
+        # Use a view delegate so native popup menus cannot override the separator.
+        self.operation.setView(QListView(self.operation))
+        self.operation.setItemDelegate(OperationDelegate(self.operation))
+        self.operation.addItem(OPERATION_LABELS["enhance"], "enhance")
+        self.operation.insertSeparator(1)
+        for name in sorted(
+            (name for name in OPERATIONS if name != "enhance"), key=OPERATION_LABELS.__getitem__
+        ):
+            self.operation.addItem(OPERATION_LABELS[name], name)
         self.operation.currentTextChanged.connect(self.refresh)
         controls.addWidget(QLabel("Operation"))
         controls.addWidget(self.operation)
@@ -215,7 +221,7 @@ class MainWindow(QMainWindow):
         self.table.clearSelection()
         self.table.clearContents()
         self.table.setRowCount(len(self.paths))
-        operation = self.operation.currentText()
+        operation = self.operation.currentData()
         for row, path in enumerate(self.paths):
             try:
                 size = f"{path.stat().st_size / 1024**2:.2f}"
@@ -294,7 +300,7 @@ class MainWindow(QMainWindow):
             return
 
         # Freeze this batch before opening the dialog or creating any new output files.
-        operation = self.operation.currentText()
+        operation = self.operation.currentData()
         sources = self.paths[:] if all_eligible else self.selected_paths()
 
         single_selected = not all_eligible and len(sources) == 1

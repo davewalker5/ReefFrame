@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "operation": "gamma",
+  "settings": {
+    "comparison": false,
+    "overwrite": false,
+    "output_name": "",
+    "gamma": 1.0,
+    "shadow_lift": 0.0,
+    "shadow_range": 0.35,
+    "crf": 18,
+    "preset": "slow"
+  }
+}

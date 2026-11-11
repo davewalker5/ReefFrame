@@ -95,21 +95,32 @@ class FFmpegRunner:
             [self.ffmpeg, "-hide_banner", option], text=True, stderr=subprocess.STDOUT
         )
 
-    def unavailable(self, operation: str, comparison: bool = False) -> str:
+    def unavailable(
+        self, operation: str, comparison: bool = False, settings: dict | None = None
+    ) -> str:
         """
         Explain missing capabilities, or return an empty string.
 
         :param operation: Registered operation name used to select defaults and processing
             behaviour.
         :param comparison: Whether to include original-left, processed-right comparison behaviour.
+        :param settings: Selected pipeline settings; omitted for menu-level encoder checks.
         :return: Actionable missing-capability explanation, or an empty string when supported.
         """
         required = {
             "dehaze": ["eq"],
-            "enhance": ["eq", "vibrance"],
+            "contrast": ["eq"],
+            "gamma": ["eq", "scale", "format", "lutyuv"],
+            "colour": ["colorchannelmixer"],
             "gif": ["fps", "scale", "palettegen", "paletteuse"],
             "stabilise": ["vidstabdetect", "vidstabtransform"],
         }.get(operation, [])
+
+        if operation == "enhance" and settings is not None:
+            from config.pipeline import PipelineConfiguration
+            from processing.enhance import required_filters
+
+            required = list(required_filters(PipelineConfiguration.from_settings(settings)))
 
         # Comparison needs composition filters; VidStab also uses a lossless intermediate.
         if comparison:
@@ -121,7 +132,9 @@ class FFmpegRunner:
             ["png"] if operation == "snapshot" else ["gif"] if operation == "gif" else ["libx264"]
         )
 
-        if operation in ("convert", "stabilise"):
+        if operation in ("convert", "stabilise") or (
+            operation == "enhance" and settings is not None and settings["audio_policy"] == "aac"
+        ):
             encoders.append("aac")
 
         if operation == "stabilise" and comparison:

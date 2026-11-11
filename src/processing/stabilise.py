@@ -4,6 +4,7 @@ from pathlib import Path
 
 from config.settings import validate
 from processing.commands import COMPARISON_SCALE, audio_arguments, video_arguments
+from processing.correction_filters import motion_detection_filter, stabilise_filter
 
 
 def build_phases(source: Path, destination: Path, settings: dict) -> list[tuple[str, list[str]]]:
@@ -17,10 +18,8 @@ def build_phases(source: Path, destination: Path, settings: dict) -> list[tuple[
     :raises ValueError: If the operation settings are invalid.
     """
     s = validate("stabilise", settings)
-    detect = f"vidstabdetect=shakiness={s['shakiness']}:accuracy={s['accuracy']}:result=motion.trf"
-    transform = (
-        f"vidstabtransform=input=motion.trf:smoothing={s['smoothing']}:optzoom={s['optzoom']}"
-    )
+    detect = motion_detection_filter(s)
+    transform = stabilise_filter(s)
     phases = [
         (
             "Motion detection",

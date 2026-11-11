@@ -8,10 +8,39 @@ import sys
 from importlib.resources import files
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QSettings, QStandardPaths
 
-OPERATIONS = ("convert", "dehaze", "enhance", "reduce", "gif", "snapshot", "stabilise")
+OPERATIONS = (
+    "convert",
+    "dehaze",
+    "enhance",
+    "reduce",
+    "gif",
+    "snapshot",
+    "stabilise",
+    "gamma",
+    "colour",
+    "contrast",
+)
+OPERATION_LABELS = {
+    "contrast": "Contrast Enhancement",
+    "convert": "Convert MOV to MP4",
+    "dehaze": "Dehaze",
+    "enhance": "Enhancement Pipeline",
+    "reduce": "Reduce Size",
+    "gif": "Convert to Animated GIF",
+    "snapshot": "Extract a Frame as a Still Image",
+    "stabilise": "Stabilise",
+    "gamma": "Gamma Correction and Shadow Uplift",
+    "colour": "Colour Correction",
+}
 RANGES = {
+    "gamma": (0.1, 3.0),
+    "shadow_lift": (0.0, 0.5),
+    "shadow_range": (0.05, 1.0),
+    "red_gain": (0.0, 2.0),
+    "green_gain": (0.0, 2.0),
+    "blue_gain": (0.0, 2.0),
     "crf": (0, 51),
     "contrast": (0, 3),
     "second_contrast": (0, 3),
@@ -61,16 +90,19 @@ def log_directory() -> Path:
 
     :return: Log directory; it may not exist yet.
     """
-    return Path(
-        QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
-    ) / "logs"
+    return (
+        Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
+        / "logs"
+    )
 
 
 def migrate_user_settings() -> None:
     """Copy legacy preferences and presets when their new locations do not exist."""
-    legacy = Path.home() / (
-        "Library/Application Support" if sys.platform == "darwin" else ".config"
-    ) / "ReefFrame"
+    legacy = (
+        Path.home()
+        / ("Library/Application Support" if sys.platform == "darwin" else ".config")
+        / "ReefFrame"
+    )
     destination = user_directory()
     if legacy == destination:
         return
@@ -109,6 +141,10 @@ def validate(operation: str, settings: dict) -> dict:
     :return: Validated copy of the supplied settings, leaving the input unchanged.
     :raises ValueError: If keys, types, ranges, values or output filenames are invalid.
     """
+    if operation == "enhance":
+        from config.pipeline import validate_pipeline
+
+        return validate_pipeline(settings)
     expected = load_default(operation)
     if not isinstance(settings, dict) or settings.keys() != expected.keys():
         raise ValueError("Settings must contain exactly the documented keys")
@@ -116,7 +152,9 @@ def validate(operation: str, settings: dict) -> dict:
         value = settings[key]
         valid = type(value) is type(default)
         if type(default) is float:
-            valid = type(value) in (int, float) and math.isfinite(value)
+            # Python integers are finite even when too large for a C double.
+            # Range checks reject them without overflowing math.isfinite().
+            valid = type(value) in (int, float) and (type(value) is int or math.isfinite(value))
         if not valid:
             raise ValueError(f"Invalid type for {key}")
         if key in RANGES and not RANGES[key][0] <= value <= RANGES[key][1]:
@@ -150,9 +188,15 @@ def load_preset(path: Path, operation: str) -> dict:
     document = json.loads(path.read_text())
     if not isinstance(document, dict) or set(document) != {"version", "operation", "settings"}:
         raise ValueError("Invalid preset structure")
+    if operation == "enhance" and document["operation"] == "enhance" and document["version"] == 1:
+        raise ValueError(
+            "The Enhancement Pipeline preset format changed. Recreate this legacy preset; "
+            "its vibrance adjustment cannot be imported into the new six-stage pipeline."
+        )
+    version = 2 if operation == "enhance" else 1
     if (
         type(document["version"]) is not int
-        or document["version"] != 1
+        or document["version"] != version
         or document["operation"] != operation
     ):
         raise ValueError("Preset version or operation mismatch")
@@ -169,6 +213,32 @@ def save_preset(path: Path, operation: str, settings: dict) -> None:
     :raises ValueError: If the settings are invalid.
     :raises OSError: If the directory or preset cannot be written.
     """
-    document = dict(version=1, operation=operation, settings=validate(operation, settings))
+    document = dict(
+        version=2 if operation == "enhance" else 1,
+        operation=operation,
+        settings=validate(operation, settings),
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+def preset_directory(fallback: Path) -> Path:
+    """Return the remembered preset folder when it remains available.
+
+    :param fallback: Existing default location for this dialog.
+    :return: Valid remembered directory or the supplied fallback.
+    """
+    preferences = QSettings(str(user_directory() / "preferences.ini"), QSettings.Format.IniFormat)
+    stored = preferences.value("preset_directory", "")
+    directory = Path(str(stored)) if stored else None
+    return directory if directory is not None and directory.is_dir() else fallback
+
+
+def remember_preset_directory(path: Path) -> None:
+    """Persist the parent of a successfully loaded or saved preset.
+
+    :param path: Successfully used preset file path.
+    """
+    preferences = QSettings(str(user_directory() / "preferences.ini"), QSettings.Format.IniFormat)
+    preferences.setValue("preset_directory", str(path.resolve().parent))
+    preferences.sync()

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from config.settings import validate
 from processing.commands import filtered_video
+from processing.correction_filters import dehaze_filter
 
 
 def build_arguments(source: Path, destination: Path, settings: dict) -> list[str]:
@@ -16,7 +17,5 @@ def build_arguments(source: Path, destination: Path, settings: dict) -> list[str
     :return: Ordered FFmpeg arguments, excluding the executable and runner-wide options.
     :raises ValueError: If the operation settings are invalid.
     """
-    s = validate("dehaze", settings)
-    return filtered_video(
-        source, destination, s, f"eq=contrast={s['contrast']}:brightness={s['brightness']}", False
-    )
+    values = validate("dehaze", settings)
+    return filtered_video(source, destination, values, dehaze_filter(values))

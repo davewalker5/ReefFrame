@@ -21,8 +21,11 @@ def test_integration(clip, operation, comparison):
     :param comparison: Whether to include original-left, processed-right comparison behaviour.
     """
     runner = FFmpegRunner()
-    if runner.unavailable(operation, comparison):
-        pytest.skip(runner.unavailable(operation, comparison))
+    settings = load_default(operation) | {"comparison": comparison}
+    if reason := runner.unavailable(
+        operation, comparison, settings if operation == "enhance" else None
+    ):
+        pytest.skip(reason)
     if operation == "convert":
         source = clip.with_suffix(".MOV")
         shutil.copyfile(clip, source)

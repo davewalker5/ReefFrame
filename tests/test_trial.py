@@ -60,7 +60,7 @@ def test_trial_phase_inputs(operation, comparison):
     settings = load_default(operation) | {"comparison": comparison}
     phases = (
         module.build_phases(source, destination, settings)
-        if operation == "stabilise"
+        if operation in ("stabilise", "enhance")
         else [("Rendering", module.build_arguments(source, destination, settings))]
     )
     for _, arguments in phases:
@@ -83,9 +83,11 @@ def test_trial_output(clip, operation, comparison):
     :param comparison: Whether to include original/processed comparison.
     """
     runner = FFmpegRunner()
-    if reason := runner.unavailable(operation, comparison):
-        pytest.skip(reason)
     settings = load_default(operation) | {"comparison": comparison, "preset": "ultrafast"}
+    if reason := runner.unavailable(
+        operation, comparison, settings if operation == "enhance" else None
+    ):
+        pytest.skip(reason)
     result = run_batch(
         [clip], operation, settings, runner, lambda *args: None, trial=TrialRange(0.25, 0.75)
     )[0]
@@ -148,7 +150,7 @@ def test_trial_selection_context(application, tmp_path, monkeypatch, all_eligibl
     for name in ("a.mp4", "b.mp4"):
         (tmp_path / name).touch()
     window.folder = tmp_path
-    window.operation.setCurrentText("enhance")
+    window.operation.setCurrentIndex(window.operation.findData("enhance"))
     window.refresh()
     window.table.clearSelection()
     for row in range(count):
@@ -191,7 +193,11 @@ def test_custom_trial_output_and_invalid_interval(clip):
     runner = FFmpegRunner()
     full_output = clip.parent / "custom.mp4"
     full_output.write_bytes(b"existing full render")
-    settings = load_default("enhance") | {"output_name": "custom.mp4", "overwrite": True}
+    settings = load_default("enhance") | {
+        "enabled": ["dehaze"],
+        "output_name": "custom.mp4",
+        "overwrite": True,
+    }
     original = clip.read_bytes()
     invalid = run_batch(
         [clip], "enhance", settings, runner, lambda *args: None, trial=TrialRange(0, 2)

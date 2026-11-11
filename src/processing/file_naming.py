@@ -3,6 +3,9 @@
 from pathlib import Path
 
 SUFFIXES = {
+    "contrast": "-contrast",
+    "gamma": "-gamma",
+    "colour": "-colour-corrected",
     "convert": "",
     "dehaze": "-dehazed",
     "enhance": "-enhanced",
@@ -46,8 +49,7 @@ def output_path(source: Path, operation: str, settings: dict) -> Path:
     :param operation: Registered operation name used to select defaults and processing behaviour.
     :param settings: Complete operation settings; validated before use.
     :return: Destination path using the configured filename or operation suffix.
-    :raises ValueError: If the filename extension is invalid or the destination resolves to the
-        source.
+    :raises ValueError: If the destination resolves to the source.
     """
     extension = {"gif": ".gif", "snapshot": ".png"}.get(operation, ".mp4")
     suffix = SUFFIXES[operation]
@@ -57,7 +59,7 @@ def output_path(source: Path, operation: str, settings: dict) -> Path:
         suffix += "-comparison"
     destination = source.with_name(settings["output_name"] or source.stem + suffix + extension)
     if destination.suffix.lower() != extension:
-        raise ValueError(f"Output must end in {extension}")
+        destination = destination.with_name(destination.name + extension)
     if destination.resolve() == source.resolve():
         raise ValueError("Output must not overwrite the source")
     return destination

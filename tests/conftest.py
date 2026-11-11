@@ -57,3 +57,25 @@ def clip(tmp_path, request):
         args += ["-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "aac"]
     subprocess.run(args + ["-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)], check=True)
     return path
+
+
+@pytest.fixture(autouse=True)
+def isolated_preferences(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test's user preferences separate from real settings and other tests.
+
+    :param tmp_path: Isolated test directory.
+    :param monkeypatch: Scoped application-path replacement.
+    """
+    from PySide6.QtCore import QStandardPaths
+
+    directory = tmp_path / "user-config"
+    original = QStandardPaths.writableLocation
+    monkeypatch.setattr(
+        QStandardPaths,
+        "writableLocation",
+        lambda location: (
+            str(directory)
+            if location == QStandardPaths.StandardLocation.AppConfigLocation
+            else original(location)
+        ),
+    )
